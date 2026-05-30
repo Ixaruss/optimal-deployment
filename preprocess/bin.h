@@ -48,7 +48,7 @@ class Bin {
 private:
     // In-memory data caches
     std::vector<uint8_t> vec_matrix;
-    std::vector<int16_t> elev_matrix;
+    std::vector<ElevCell> elev_matrix;
     public: Config conf;
 
 
@@ -114,6 +114,8 @@ public:
     bool getGridCoords(double lat, double lng, int& out_r, int& out_c);
 
     int16_t getElevation(double lat, double lng);
+
+    float getSlope(double lat, double lng);
 
     bool getStatusRoad(double lat, double lng);
 
