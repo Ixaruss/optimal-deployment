@@ -1,6 +1,5 @@
 /preprocess/image/
 *.bin
 .clangd
-/preprocess/maps
 *.ppm
 x
