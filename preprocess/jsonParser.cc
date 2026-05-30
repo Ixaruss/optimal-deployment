@@ -153,6 +153,11 @@ Json::Value Config::to_json() const {
     j["input"]["ib"]         = input.ib;
     j["input"]["elevation"]  = input.elevation;
 
+    j["distance"]["from_ib"]       = distance.from_ib;
+    j["distance"]["from_water"]    = distance.from_water;
+    j["distance"]["from_road"]     = distance.from_road;
+    j["distance"]["from_rail"]     = distance.from_rail;
+
     // output paths
     j["output"]["matrix_file"]    = output.matrix_file;
     j["output"]["elevation_file"] = output.elevation_file;
