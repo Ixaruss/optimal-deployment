@@ -17,10 +17,12 @@
 const int    RESOLUTION      = 100;
 const int    ELEV_RESOLUTION = 100;
 
-const double VEC_ORIGIN_X    = 2.88589e+06;
-const double VEC_ORIGIN_Y    = 5.26028e+06;
-const double VEC_MIN_X = 2.28137e+06;
-const double VEC_MAX_Y = 5.67272e+06;
+const double VEC_MIN_X    = 2653415.3157514133;
+const double VEC_MAX_X    = 5977534.0136858551;
+const double VEC_MIN_Y    = 2151725.9403438065;
+const double VEC_MAX_Y    = 5368236.2448166199;
+const double VEC_ORIGIN_X = 2653415.3157514133;  // min_x
+const double VEC_ORIGIN_Y = 5368236.2448166199;  // max_y
 
 const int   DISTANCE_FROM_IB = 10000;
 const int   DISTANCE_FROM_WATER = 1000;
