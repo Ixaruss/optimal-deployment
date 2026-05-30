@@ -3,14 +3,11 @@
 using namespace std;
 
 int lib::calc_rows(int resolution) {
-
     if (Config::is_available()) {
         Config cfg = Config::load();
         return (int)ceil((cfg.grid.max_y - cfg.grid.min_y) / resolution);
-
-
     }
-    return (int)ceil((VEC_MAX_Y - VEC_ORIGIN_X) / resolution);
+    return (int)ceil((VEC_MAX_Y - VEC_MIN_Y) / resolution);
 }
 
 int lib::calc_cols(int resolution) {
@@ -18,7 +15,7 @@ int lib::calc_cols(int resolution) {
         Config cfg = Config::load();
         return (int)ceil((cfg.grid.max_x - cfg.grid.min_x) / resolution);
     }
-    return (int)ceil((VEC_ORIGIN_Y - VEC_MIN_X) / resolution);
+    return (int)ceil((VEC_MAX_X - VEC_MIN_X) / resolution);
 }
 
 vector<double> lib::get_min_max_coordiantes(string path, int type) {

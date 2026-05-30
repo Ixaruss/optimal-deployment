@@ -41,25 +41,59 @@ bool Bin::ensure_matrices_loaded() {
      }
 
      if (!elevation_loaded) {
-         size_t total_elev_cells = (size_t)ELEV_ROWS * ELEV_COLS;
-         std::cout << "[lazy-load] Loading "<< elev_path <<"into memory (" << (total_elev_cells * sizeof(int16_t)) / 1e6 << " MB)...\n";
+             // get elev grid dims from config if available, else hardcoded constants
+             size_t elev_rows, elev_cols;
+             if (Config::is_available()) {
+                 Config cfg = Config::load();
+                 elev_rows  = (size_t)cfg.grid.rows;
+                 elev_cols  = (size_t)cfg.grid.cols;
+             } else {
+                 elev_rows  = (size_t)ELEV_ROWS;
+                 elev_cols  = (size_t)ELEV_COLS;
+             }
 
-         std::ifstream file(elev_path , std::ios::binary);
-         if (!file.is_open()) {
-             std::cerr << "[lazy-load] ERROR: Could not open "<< elev_path <<"from disk!\n";
-             return false;
-         }
+             size_t total_elev_cells = elev_rows * elev_cols;
+             size_t expected_bytes   = total_elev_cells * sizeof(ElevCell);
 
-         elev_matrix.resize(total_elev_cells);
-         file.read(reinterpret_cast<char*>(elev_matrix.data()), total_elev_cells * sizeof(int16_t));
-         if (file.gcount() != (std::streamsize)(total_elev_cells * sizeof(int16_t))) {
-             std::cerr << "[lazy-load] ERROR: Size mismatch while reading "<< elev_path <<"\n";
-             elev_matrix.clear();
-             return false;
+             std::cout << "[lazy-load] Loading " << elev_path << " into memory ("
+                       << expected_bytes / 1e6 << " MB, "
+                       << total_elev_cells << " cells, "
+                       << sizeof(ElevCell) << " bytes/cell)...\n";
+
+             std::ifstream file(elev_path, std::ios::binary);
+             if (!file.is_open()) {
+                 std::cerr << "[lazy-load] ERROR: could not open " << elev_path << "\n";
+                 return false;
+             }
+
+             // verify file size before reading
+             file.seekg(0, std::ios::end);
+             size_t file_bytes = (size_t)file.tellg();
+             file.seekg(0, std::ios::beg);
+
+             if (file_bytes != expected_bytes) {
+                 std::cerr << "[lazy-load] ERROR: size mismatch reading " << elev_path
+                           << " — expected " << expected_bytes / 1e6
+                           << " MB, got "    << file_bytes   / 1e6 << " MB\n"
+                           << "  Hint: elev.bin may be old int16 format — rebuild with build_elevation_matrix()\n";
+                 return false;
+             }
+
+             elev_matrix.resize(total_elev_cells);
+             file.read(reinterpret_cast<char*>(elev_matrix.data()), expected_bytes);
+
+             if ((size_t)file.gcount() != expected_bytes) {
+                 std::cerr << "[lazy-load] ERROR: read " << file.gcount()
+                           << " of " << expected_bytes << " bytes from " << elev_path << "\n";
+                 elev_matrix.clear();
+                 return false;
+             }
+
+             file.close();
+             elevation_loaded = true;
+             std::cout << "[lazy-load] Elevation loaded — "
+                       << elev_rows << " x " << elev_cols << "\n";
          }
-         file.close();
-         elevation_loaded = true;
-     }
 
      return vector_loaded && elevation_loaded;
  }
@@ -79,22 +113,66 @@ bool Bin::ensure_matrices_loaded() {
      return (out_r >= 0 && out_r < VEC_ROWS && out_c >= 0 && out_c < VEC_COLS);
  }
 
- // Extracts elevation data value in meters
  int16_t Bin::getElevation(double lat, double lng) {
      if (!poCT || !ensure_matrices_loaded()) return -9999;
 
-     double x = lng;
-     double y = lat;
+     double x = lng, y = lat;
      if (!poCT->Transform(1, &x, &y)) return -9999;
 
-     int elev_c = std::floor((x - ELEV_ORIGIN_X) / RESOLUTION);
-     int elev_r = std::floor((ELEV_ORIGIN_Y - y) / RESOLUTION);
+     double ELEV_OX, ELEV_OY;
+     int    E_ROWS, E_COLS;
+     if (Config::is_available()) {
+         Config cfg = Config::load();
+         ELEV_OX = cfg.grid.origin_x;
+         ELEV_OY = cfg.grid.origin_y;
+         E_ROWS  = cfg.grid.rows;
+         E_COLS  = cfg.grid.cols;
+     } else {
+         ELEV_OX = ELEV_ORIGIN_X;
+         ELEV_OY = ELEV_ORIGIN_Y;
+         E_ROWS  = ELEV_ROWS;
+         E_COLS  = ELEV_COLS;
+     }
 
-     if (elev_r >= 0 && elev_r < ELEV_ROWS && elev_c >= 0 && elev_c < ELEV_COLS) {
-         size_t idx = (size_t)elev_r * ELEV_COLS + elev_c;
-         return elev_matrix[idx];
+     int elev_c = (int)std::floor((x - ELEV_OX) / RESOLUTION);
+     int elev_r = (int)std::floor((ELEV_OY - y)  / RESOLUTION);
+
+     if (elev_r >= 0 && elev_r < E_ROWS &&
+         elev_c >= 0 && elev_c < E_COLS) {
+         return elev_matrix[(size_t)elev_r * E_COLS + elev_c].elevation;
      }
      return -9999;
+ }
+
+ float Bin::getSlope(double lat, double lng) {
+     if (!poCT || !ensure_matrices_loaded()) return -9999.0f;
+
+     double x = lng, y = lat;
+     if (!poCT->Transform(1, &x, &y)) return -9999.0f;
+
+     double ELEV_OX, ELEV_OY;
+     int    E_ROWS, E_COLS;
+     if (Config::is_available()) {
+         Config cfg = Config::load();
+         ELEV_OX = cfg.grid.origin_x;
+         ELEV_OY = cfg.grid.origin_y;
+         E_ROWS  = cfg.grid.rows;
+         E_COLS  = cfg.grid.cols;
+     } else {
+         ELEV_OX = ELEV_ORIGIN_X;
+         ELEV_OY = ELEV_ORIGIN_Y;
+         E_ROWS  = ELEV_ROWS;
+         E_COLS  = ELEV_COLS;
+     }
+
+     int elev_c = (int)std::floor((x - ELEV_OX) / RESOLUTION);
+     int elev_r = (int)std::floor((ELEV_OY - y)  / RESOLUTION);
+
+     if (elev_r >= 0 && elev_r < E_ROWS &&
+         elev_c >= 0 && elev_c < E_COLS) {
+         return elev_matrix[(size_t)elev_r * E_COLS + elev_c].slope;
+     }
+     return -9999.0f;
  }
 
  bool Bin::getStatusRoad(double lat, double lng) {
