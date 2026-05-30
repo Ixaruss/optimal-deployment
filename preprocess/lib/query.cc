@@ -333,7 +333,7 @@ bool Bin::point_in_polygon(double px, double py,
              if (flag_water_line && (cell & (1 << BIT_WATER_LINE))) { water_count++; continue; }
              if (flag_water_area && (cell & (1 << BIT_WATER_AREA))) { water_count++; continue; }
              if (flag_ib         && (cell & (1 << BIT_IB)))         { ib_count++;    continue; }
-
+             if (elev_matrix[(size_t)r * VEC_COLS + c].slope > 10) { continue; }
              // infra requirement — only if at least one infra flag is on
              if (need_infra) {
                  bool road_ok = flag_road && (cell & (1 << BIT_ROAD));
