@@ -131,7 +131,12 @@ namespace lib {
                   << sizeof(T) << " bytes/cell)\n";
         return true;
     }
-
+    //returns 0 if conversion is successfull or -1
+    //inpu_file_path = required
+    //output_file_path = optional (must include file extension)
+    //folder_path = optional (must end with forward oblique i.e. '/')
+    int reproject(const std::string& input_file_path);
+    bool is_7755(const std::string& shp_path);
 };
 
 #endif

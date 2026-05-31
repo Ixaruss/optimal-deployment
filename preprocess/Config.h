@@ -9,11 +9,6 @@
 #include <json/json.h>
 #include <map>
 
-//returns 0 if conversion is successfull or -1
-//inpu_file_path = required
-//output_file_path = optional (must include file extension)
-//folder_path = optional (must end with forward oblique i.e. '/')
-int EPSG4326_TO_EPSG7755(std::string input_file_path, std::optional<std::string> output_file_path, std::optional<std::string> parent_folder_path);
 
 //json parser enums and class
 enum Target {
