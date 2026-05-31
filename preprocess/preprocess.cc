@@ -328,7 +328,13 @@ int main() {
 
     for (auto& job : jobs) {
         cout << "\n=== " << job.name << " (buffer=" << job.distance << "m) ===\n";
-
+        if (!lib::is_7755(job.shp)) {
+            cout << "[preprocess] reprojecting " << job.shp << "...\n";
+            if (lib::reproject(job.shp) != 0) {
+                cerr << "[preprocess] ERROR: reprojection failed\n";
+                return -1;
+            }
+        }
         uint8_t* buf = rasterize_layer(job.shp, ROWS, COLS, ox, oy, job.boundary_only);
         if (!buf) { cerr << "[preprocess] SKIP: " << job.name << "\n"; continue; }
 

@@ -108,6 +108,13 @@ int Bin::build_matrix() {
 
     // --- process each layer individually ---
     auto process_layer = [&](const std::string& shp_path, int bit_index,int distance) -> bool {
+        if (!lib::is_7755(shp_path)) {
+            cout << "[preprocess] reprojecting " << shp_path << "...\n";
+            if (lib::reproject(shp_path) != 0) {
+                cerr << "[preprocess] ERROR: reprojection failed\n";
+                return false;
+            }
+        }
         cout << "[matrix] Processing: " << shp_path << " → bit " << bit_index << "\n";
 
         GDALDataset* shp_ds = (GDALDataset*)GDALOpenEx(shp_path.c_str(), GDAL_OF_VECTOR, nullptr, nullptr, nullptr);
