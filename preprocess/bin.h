@@ -59,11 +59,11 @@ private:
      int VEC_ROWS = 0;
      int VEC_COLS = 0;
 
-     bool flag_road = true;
-     bool flag_rail = true;
-     bool flag_water_line = false;
-     bool flag_water_area = false;
-     bool flag_ib = false;
+     bool flag_road = false;
+     bool flag_rail = false;
+     bool flag_water_line = true;
+     bool flag_water_area = true;
+     bool flag_ib = true;
 
      BoundingBox mbr;
 
