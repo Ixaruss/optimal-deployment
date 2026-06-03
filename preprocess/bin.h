@@ -14,8 +14,12 @@
 #include "./lib.h"
 
 // Global constants
-const short WRITE = 1;
-const short IN_MEM = 0;
+const bool WRITE = 1;
+const bool IN_MEM = 0;
+const bool USE_MULTI_THREADS = 1;
+const bool FULL_MATRIX = 1;
+const bool LIMIT_MEMORY = 1;
+const bool COMBINE = 0;
 
 struct BoundingBox {
     double min_lat;
@@ -41,7 +45,7 @@ struct FeasibleGrid {
     std::vector<FeasibleCell> cells;
     int origin_r;    // top-left of AABB in original matrix
     int origin_c;
-    int height;      // AABB dimensions in cells
+    int height;      // jAABB dimensions in cells
     int width;
 };
 class Bin {
@@ -97,7 +101,7 @@ public:
 
     public: static int build_matrix();
 
-    public: static int build_elevation_matrix();
+    public: static int build_elevation_matrix(bool split = 1);
 
     public: static int refresh_road_layer(std::optional<std::string> path);
 
@@ -115,7 +119,7 @@ public:
 
     int16_t getElevation(double lat, double lng);
 
-    float getSlope(double lat, double lng);
+    bool getSlope(double lat, double lng);
 
     bool getStatusRoad(double lat, double lng);
 
@@ -133,11 +137,13 @@ public:
 
     BoundingBox getMinimumBoundingBox();
 
-    FeasibleGrid getFeasibleGrid(short op = IN_MEM);
+    FeasibleGrid getFeasibleGrid(short op = IN_MEM, short opt = 0, short limit_ram = false);
 
     std::pair<double,double> getMapOrigins();
 
     int getTerrianResolution();
+
+    bool lineOfSight(int x1, int y1, int x2, int y2);
 
     void visualize(const std::string& output_path);
 
