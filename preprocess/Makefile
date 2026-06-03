@@ -8,4 +8,4 @@ verify:
 	g++ preprocess.cc jsonParser.cc reproject.cc lib/*.cc -o x $(gdal-config --cflags --libs) -ljsoncpp -lgdal -lpng16 -std=c++23 && ./x
 
 test:
-	g++  test.cc jsonParser.cc lib/*.cc -o x $(gdal-config --cflags --libs) -ljsoncpp -lgdal -lpng16 -std=c++23 && ./x
+	g++  test.cc jsonParser.cc reproject.cc  lib/*.cc -o x $(gdal-config --cflags --libs) -ljsoncpp -lgdal -lpng16 -std=c++23 && ./x
