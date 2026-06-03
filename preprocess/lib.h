@@ -40,6 +40,7 @@ const int BIT_RAIL       = 1;
 const int BIT_WATER_AREA = 2;
 const int BIT_WATER_LINE = 3;
 const int BIT_IB         = 4;
+const int BIT_SLOPE      = 5;
 
 //input files
 const std::string DEFAULT_ROAD_SHP       = "roads.shp";
@@ -131,10 +132,6 @@ namespace lib {
                   << sizeof(T) << " bytes/cell)\n";
         return true;
     }
-    //returns 0 if conversion is successfull or -1
-    //inpu_file_path = required
-    //output_file_path = optional (must include file extension)
-    //folder_path = optional (must end with forward oblique i.e. '/')
     int reproject(const std::string& input_file_path);
     bool is_7755(const std::string& shp_path);
 };
