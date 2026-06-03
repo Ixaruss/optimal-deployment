@@ -11,6 +11,7 @@ static Layer_vals str_to_layer(const string& val) {
     if (val == "railways")    return RAILS;
     if (val == "waterlines")  return WATER_LINES;
     if (val == "waterbodies") return WATER_AREAS;
+    if (val == "slope")       return SLOPE;
     if (val == "ib")          return IB;
     if (val == "alt")         return ALT;
     throw runtime_error("Invalid layer value: " + val);
@@ -22,6 +23,7 @@ static string layer_to_str(Layer_vals v) {
         case RAILS:       return "railways";
         case WATER_LINES: return "waterlines";
         case WATER_AREAS: return "waterbodies";
+        case SLOPE:       return "slope";
         case IB:          return "ib";
         case ALT:         return "alt";
 
@@ -74,7 +76,6 @@ Config Config::from_json(const Json::Value& j) {
     conf.input.water_lines = j["input"]["water_lines"].asString();
     conf.input.ib = j["input"]["ib"].asString();
     conf.input.elevation = j["input"]["elevation"].asString();
-    cout<<conf.input.ib <<endl;
     conf.output.matrix_file = j["output"]["matrix_file"].asString();
     conf.output.elevation_file = j["output"]["elevation_file"].asString();
     conf.output.feasible = j["output"]["feasible"].asString();
@@ -162,7 +163,6 @@ Json::Value Config::to_json() const {
     j["output"]["matrix_file"]    = output.matrix_file;
     j["output"]["elevation_file"] = output.elevation_file;
     j["output"]["feasible"]       = output.feasible;
-
 
     return j;
 }

@@ -36,6 +36,7 @@ enum Layer_vals {
     WATER_LINES,
     WATER_AREAS,
     IB,
+    SLOPE,
     ALT
 };
 
@@ -46,7 +47,7 @@ struct Grid_Conf {
   double min_x, max_x;
   double min_y, max_y;
   int   rows;
-      int   cols;
+  int   cols;
 };
 
 struct Distance {
