@@ -1,4 +1,5 @@
 #include "../bin.h"
+#include <cstdint>
 #include <gdal_utils.h>
 using namespace std;
 
@@ -48,7 +49,7 @@ static float compute_slope(const int16_t* elev,
     return atan(sqrt(dzdx * dzdx + dzdy * dzdy)) * (180.0f / (float)M_PI);
 }
 
-int Bin::build_elevation_matrix() {
+int Bin::build_elevation_matrix(bool split) {
     string opath, ipath;
     Config::is_available() ? opath = Config::load().output.elevation_file : opath = DEFAULT_ELEVATION_MATRIX;
     Config::is_available() ? ipath = Config::load().input.elevation        : ipath = DEFAULT_ELEVATION_FILE;
@@ -208,7 +209,14 @@ int Bin::build_elevation_matrix() {
     // ── 7. allocate output ElevCell array ──────────────────────────────────
     // slope is computed directly into out[i].slope — no intermediate
     // float buffer needed. RAM = elev_buf (int16) + out (ElevCell) only.
-    ElevCell* out = (ElevCell*)malloc(total_cells * sizeof(ElevCell));
+    ElevCell* out;
+    float*slope;
+    if(!split) {
+        out = (ElevCell*)malloc(total_cells * sizeof(ElevCell));
+    }else {
+        slope = (float*)malloc(total_cells * sizeof(float));
+    }
+
     if (!out) {
         cerr << "[elevation] ERROR: failed to allocate ElevCell buffer\n";
         free(elev_buf);
@@ -226,28 +234,54 @@ int Bin::build_elevation_matrix() {
             cout << "[elevation] slope row " << r << "/" << OUT_ROWS << "\n";
         for (int c = 0; c < OUT_COLS; c++) {
             size_t idx        = (size_t)r * OUT_COLS + c;
+            if(!split){
             out[idx].elevation = elev_buf[idx];
             out[idx].slope     = compute_slope(
                 elev_buf, r, c, OUT_ROWS, OUT_COLS, RESOLUTION);
             if (out[idx].slope == -9999.0f) nodata_slope++;
+            }else {
+                slope[idx] = compute_slope(elev_buf, r, c, OUT_ROWS, OUT_COLS, RESOLUTION);
+            }
         }
     }
-
-    free(elev_buf);   // done with raw elevation — ElevCell has it now
+    if(!split)
+        free(elev_buf);   // done with raw elevation — ElevCell has it now
 
     cout << "[elevation] Slope done. Nodata slope cells: " << nodata_slope
          << " (" << (nodata_slope * 100.0 / total_cells) << "%)\n";
 
     // ── 9. write bin ───────────────────────────────────────────────────────
-    FILE* f = fopen(opath.c_str(), "wb");
-    if (!f) {
-        cerr << "[elevation] ERROR: could not open " << opath << " for writing\n";
+    if(!split){
+        FILE* f = fopen(opath.c_str(), "wb");
+        if (!f) {
+            cerr << "[elevation] ERROR: could not open " << opath << " for writing\n";
+            free(out);
+            return -1;
+        }
+        fwrite(out, sizeof(ElevCell), total_cells, f);
+        fclose(f);
         free(out);
-        return -1;
+    }else{
+        FILE* f = fopen(opath.c_str(), "wb");
+        if (!f) {
+            cerr << "[elevation] ERROR: could not open " << opath << " for writing\n";
+            free(elev_buf);
+            return -1;
+        }
+        fwrite(elev_buf, sizeof(int16_t), total_cells, f);
+        fclose(f);
+        free(elev_buf);
+        cout<< "[elevation] writing slpoe";
+        f = fopen("./bin/slope.bin", "wb");
+        if (!f) {
+            cerr << "[elevation] ERROR: could not open " << opath << " for writing\n";
+            free(slope);
+            return -1;
+        }
+        fwrite(slope, sizeof(float), total_cells, f);
+        fclose(f);
+        free(slope);
     }
-    fwrite(out, sizeof(ElevCell), total_cells, f);
-    fclose(f);
-    free(out);
 
     cout << "[elevation] Written → " << opath << " ("
          << (total_cells * sizeof(ElevCell)) / 1e6 << " MB, "
