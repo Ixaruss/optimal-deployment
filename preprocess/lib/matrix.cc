@@ -16,7 +16,7 @@ using namespace lib;
 int Bin::build_matrix() {
     GDALAllRegister();
     int unfeasible_distance, from_road, from_rail, from_water;
-    int road_bit, rail_bit, waterarea_bit, waterlines_bit, ib_bit;
+    int road_bit, rail_bit, waterarea_bit, waterlines_bit, ib_bit, slope_bit;
     string road_ipath, rail_ipath, waterarea_ipath, waterlines_ipath, ib_ipath,opath;
     FILE* f = nullptr;
 
@@ -28,6 +28,7 @@ int Bin::build_matrix() {
         waterarea_bit  = layerName(cfg.layers[BIT_WATER_AREA]);
         waterlines_bit = layerName(cfg.layers[BIT_WATER_LINE]);
         ib_bit         = layerName(cfg.layers[BIT_IB]);
+        slope_bit      = layerName(cfg.layers[BIT_SLOPE]);
 
         road_ipath       = cfg.input.road;
         rail_ipath       = cfg.input.rail;
@@ -47,6 +48,7 @@ int Bin::build_matrix() {
         waterarea_bit  = BIT_WATER_AREA;
         waterlines_bit = BIT_WATER_LINE;
         ib_bit         = BIT_IB;
+        slope_bit      = BIT_SLOPE;
 
         road_ipath       = DEFAULT_ROAD_SHP;
         rail_ipath       = DEFAULT_RAIL_SHP;
