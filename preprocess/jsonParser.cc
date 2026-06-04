@@ -33,7 +33,7 @@ static string layer_to_str(Layer_vals v) {
 
 
 Config Config::load(optional<const string> path) {
-    string p = path.value_or("../config.json");
+    string p = path.value_or("./config.json");
 
     ifstream f(p);
     if (!f.is_open())
@@ -59,7 +59,7 @@ void Config::save(string path) const {
 }
 
 bool Config::is_available(optional<const string> path) {
-    return filesystem::exists(path.value_or("../config.json"));
+    return filesystem::exists(path.value_or("./config.json"));
 }
 
 

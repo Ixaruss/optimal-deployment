@@ -49,27 +49,26 @@ struct FeasibleGrid {
     int width;
 };
 class Bin {
-private:
     // In-memory data caches
-    std::vector<uint8_t> vec_matrix;
-    std::vector<ElevCell> elev_matrix;
+    public: std::vector<uint8_t> vec_matrix;
+    public: std::vector<int16_t> elev_matrix;
     public: Config conf;
 
 
     // Loading tracking flags
-     bool vector_loaded = false;
-     bool elevation_loaded = false;
+    public: bool vector_loaded = false;
+    public: bool elevation_loaded = false;
 
-     int VEC_ROWS = 0;
-     int VEC_COLS = 0;
+    public: int VEC_ROWS = 0;
+    public: int VEC_COLS = 0;
 
-     bool flag_road = false;
-     bool flag_rail = false;
-     bool flag_water_line = true;
-     bool flag_water_area = true;
-     bool flag_ib = true;
+    public: bool flag_road = false;
+    public: bool flag_rail = false;
+    public: bool flag_water_line = true;
+    public: bool flag_water_area = true;
+    public: bool flag_ib = true;
 
-     BoundingBox mbr;
+    public: BoundingBox mbr;
 
 
     OGRCoordinateTransformation* poCT;

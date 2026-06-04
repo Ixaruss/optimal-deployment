@@ -1,4 +1,5 @@
 #include "../bin.h"
+#include <cstdint>
 #include <vector>
 
 using namespace std;
@@ -53,12 +54,12 @@ bool Bin::ensure_matrices_loaded() {
              }
 
              size_t total_elev_cells = elev_rows * elev_cols;
-             size_t expected_bytes   = total_elev_cells * sizeof(ElevCell);
+             size_t expected_bytes   = total_elev_cells * sizeof(int16_t);
 
              std::cout << "[lazy-load] Loading " << elev_path << " into memory ("
                        << expected_bytes / 1e6 << " MB, "
                        << total_elev_cells << " cells, "
-                       << sizeof(ElevCell) << " bytes/cell)...\n";
+                       << sizeof(int16_t) << " bytes/cell)...\n";
 
              std::ifstream file(elev_path, std::ios::binary);
              if (!file.is_open()) {
@@ -107,10 +108,10 @@ bool Bin::ensure_matrices_loaded() {
 
      if (!poCT->Transform(1, &x, &y)) return false;
 
-     out_c = std::floor((x - VEC_ORIGIN_X) / RESOLUTION);
-     out_r = std::floor((VEC_ORIGIN_Y - y) / RESOLUTION);
+     out_c = std::floor((x - conf.grid.origin_x) / RESOLUTION);
+     out_r = std::floor((conf.grid.origin_y - y) / RESOLUTION);
 
-     return (out_r >= 0 && out_r < VEC_ROWS && out_c >= 0 && out_c < VEC_COLS);
+     return (out_r >= 0 && out_r < conf.grid.rows && out_c >= 0 && out_c < conf.grid.cols);
  }
 
  int16_t Bin::getElevation(double lat, double lng) {
@@ -139,7 +140,7 @@ bool Bin::ensure_matrices_loaded() {
 
      if (elev_r >= 0 && elev_r < E_ROWS &&
          elev_c >= 0 && elev_c < E_COLS) {
-         return elev_matrix[(size_t)elev_r * E_COLS + elev_c].elevation;
+         return elev_matrix[(size_t)elev_r * E_COLS + elev_c];
      }
      return -9999;
  }
@@ -502,7 +503,7 @@ bool Bin::point_in_polygon(double px, double py,
                      int elev_r = (int)std::floor((ELEV_OY - proj_y)  / RESOLUTION);
                      if (elev_r >= 0 && elev_r < E_ROWS &&
                          elev_c >= 0 && elev_c < E_COLS) {
-                         float slope = elev_matrix[(size_t)elev_r * E_COLS + elev_c].slope;
+                         float slope = elev_matrix[(size_t)elev_r * E_COLS + elev_c]; // to-do: give proper slope location if in future func is used
                          if (slope != -9999.0f && slope > 10.0f) {
                              slope_count++; continue;
                          }

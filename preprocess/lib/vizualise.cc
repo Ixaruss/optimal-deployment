@@ -111,7 +111,7 @@ void Bin::visualize(const std::string& output_path) {
                 if (elev_r >= 0 && elev_r < E_ROWS &&
                     elev_c >= 0 && elev_c < E_COLS) {
                     int16_t alt = elev_matrix[
-                        (size_t)elev_r * E_COLS + elev_c].elevation;
+                        (size_t)elev_r * E_COLS + elev_c]; //fix elev if need .elevation was used here before;
                     get_elevation_color(alt, red, green, blue);
                 }
             }
