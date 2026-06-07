@@ -28,6 +28,7 @@ struct Output {
     std::string matrix_file;
     std::string elevation_file;
     std::string feasible;
+    std::string slope_file;
 };
 
 enum Layer_vals {

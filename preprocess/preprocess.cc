@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <png.h>
 #include "bin.h"
+#include "lib.h"
 #include <chrono>
 using namespace std;
 
@@ -253,7 +254,7 @@ int main() {
     GDALAllRegister();
     cout<< ">>> Starting timer count" << endl;
     auto start = chrono::steady_clock::now();
-    string road_shp, rail_shp, warea_shp, wline_shp, ib_shp, elev_bin_path, opath;
+    string road_shp, rail_shp, warea_shp, wline_shp, ib_shp, elev_bin_path, opath,slope_path;
     int road_bit, rail_bit, waterarea_bit, waterlines_bit, ib_bit, slope_bit;
     int dist_road, dist_rail, dist_water, dist_ib;
     int ELEV_R, ELEV_C;
@@ -284,6 +285,7 @@ int main() {
 
         // Dynamic assignment or hardcoded to 5 based on request
         slope_bit      = 5;
+        slope_path     = cfg.output.slope_file;
 
         ox = cfg.grid.min_x;
         oy = cfg.grid.max_y;
@@ -311,6 +313,7 @@ int main() {
         ib_bit         = BIT_IB;
         slope_bit      = 5; // Hardcoded requirement for index 5
         opath          = DEFAULT_PARAM_MATRIX;
+        slope_path     = DEFAULT_SLOPE_MATRIX;
     }
 
     make_dir("bin");
@@ -359,7 +362,7 @@ int main() {
     if (!slope) { cerr << "[preprocess] ERROR: cannot allocate slope buffer\n"; return 1; }
 
     FILE* ef = fopen(elev_bin_path.c_str(), "rb");
-    FILE* sf = fopen("./bin/slope.bin", "rb");
+    FILE* sf = fopen(slope_path.c_str(), "rb");
 
     if (!ef || !sf) {
         cerr << "[preprocess] WARN: Elevation or Slope binaries missing — skipping allocation tracking\n";

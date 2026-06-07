@@ -40,6 +40,12 @@ struct FeasibleCell {
     int c;
     uint8_t value;
 };
+enum LoadOptions {
+    ALL,
+    CONSTRAINTS,
+    ELEVATION,
+    SLOPE_
+};
 
 struct FeasibleGrid {
     std::vector<FeasibleCell> cells;
@@ -52,13 +58,14 @@ class Bin {
     // In-memory data caches
     public: std::vector<uint8_t> vec_matrix;
     public: std::vector<int16_t> elev_matrix;
+    public: std::vector<float> slope_matrix;
     public: Config conf;
 
 
     // Loading tracking flags
     public: bool vector_loaded = false;
     public: bool elevation_loaded = false;
-
+    public: bool slope_loaded = false;
     public: int VEC_ROWS = 0;
     public: int VEC_COLS = 0;
 
@@ -73,7 +80,6 @@ class Bin {
 
     OGRCoordinateTransformation* poCT;
 
-   public: bool ensure_matrices_loaded();
 public:
     Bin() : poCT(nullptr) {
         GDALAllRegister();
@@ -97,6 +103,7 @@ public:
     ~Bin() {
         if (poCT) OGRCoordinateTransformation::DestroyCT(poCT);
     }
+    public: void init(std::set<LoadOptions> Options = {});
 
     public: static int build_matrix();
 

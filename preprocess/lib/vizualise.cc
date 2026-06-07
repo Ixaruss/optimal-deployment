@@ -11,10 +11,7 @@ void Bin::visualize(const std::string& output_path) {
         VEC_COLS = calc_cols(RESOLUTION);
     }
 
-    if (!ensure_matrices_loaded()) {
-        cerr << "[viz] ERROR: failed to load matrices\n";
-        return;
-    }
+    init({ ALL });
 
     int ROWS = VEC_ROWS;
     int COLS = VEC_COLS;

@@ -54,6 +54,7 @@ const std::string DEFAULT_IB_SHP         = "ib.shp";
 const std::string DEFAULT_PARAM_MATRIX     = "map.bin";
 const std::string DEFAULT_ELEVATION_MATRIX = "elev.bin";
 const std::string DEFAULT_FEASIBLE_MATRIX  = "feasible.bin";
+const std::string DEFAULT_SLOPE_MATRIX = "slope.bin";
 
 namespace lib {
 

@@ -2,7 +2,7 @@
 using namespace std;
 int main() {
     Bin b;
-    FeasibleGrid grid = b.getFeasibleGrid(WRITE, FULL_MATRIX, LIMIT_MEMORY);
+    FeasibleGrid grid = b.getFeasibleGrid(WRITE, FULL_MATRIX);
     // find cells with any bit set
     int found = 0;
     for (auto& cell : grid.cells) {

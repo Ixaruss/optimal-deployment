@@ -79,6 +79,7 @@ Config Config::from_json(const Json::Value& j) {
     conf.output.matrix_file = j["output"]["matrix_file"].asString();
     conf.output.elevation_file = j["output"]["elevation_file"].asString();
     conf.output.feasible = j["output"]["feasible"].asString();
+    conf.output.slope_file = j["output"]["slope_file"].asString();
 
     conf.grid.resolution = j["grid"]["resolution"].asInt();
     conf.grid.origin_x   = j["grid"]["origin_x"].asDouble();
@@ -163,6 +164,7 @@ Json::Value Config::to_json() const {
     j["output"]["matrix_file"]    = output.matrix_file;
     j["output"]["elevation_file"] = output.elevation_file;
     j["output"]["feasible"]       = output.feasible;
+    j["output"]["slope_file"]     = output.slope_file;
 
     return j;
 }
