@@ -1,0 +1,2 @@
+Eval Pool Time,"Distance math (distanceTo), Haversine formulas, and thread pooling.",Parallel (Multi-Threaded),"Your population size is massive, paths have too many waypoints, or thread management has high latency."
+Evolution Time,"Vector sorting, parent selection, chromosome splitting, and mutations.",Sequential (Single-Threaded),Your selection method is too complex (like sorting arrays every generation) or your crossover/mutation operations are heavy.
