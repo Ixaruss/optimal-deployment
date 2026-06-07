@@ -213,15 +213,16 @@ int Bin::build_elevation_matrix(bool split) {
     float*slope;
     if(!split) {
         out = (ElevCell*)malloc(total_cells * sizeof(ElevCell));
+        if (!out) {
+            cerr << "[elevation] ERROR: failed to allocate ElevCell buffer\n";
+            free(elev_buf);
+            return -1;
+        }
     }else {
         slope = (float*)malloc(total_cells * sizeof(float));
     }
 
-    if (!out) {
-        cerr << "[elevation] ERROR: failed to allocate ElevCell buffer\n";
-        free(elev_buf);
-        return -1;
-    }
+
 
     // ── 8. compute slope in-place using Horn's formula ─────────────────────
     // Nodata-aware: skips -9999 neighbors, falls back to one-sided diff.
