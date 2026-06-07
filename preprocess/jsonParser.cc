@@ -56,6 +56,7 @@ void Config::save(string path) const {
     Json::StreamWriterBuilder writer;
     writer["indentation"] = "    ";
     f << Json::writeString(writer, to_json());
+    f.close();
 }
 
 bool Config::is_available(optional<const string> path) {

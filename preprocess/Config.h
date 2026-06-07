@@ -68,7 +68,7 @@ class Config {
     public: std::vector<std::pair<double,double>> area_op; // can be a polygon or retangle, if not rectangle find highest breath and hightest height and assign the values to above variable to form a rectangle;
 
     static Config load(std::optional <const std::string> path = std::nullopt);
-    void save(std::string path = "../config.json") const;
+    void save(std::string path = "./config.json") const;
     static Config from_json(const Json::Value& j);
     Json::Value to_json() const;
     static bool is_available(std::optional <const std::string> path = std::nullopt);

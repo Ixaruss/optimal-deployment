@@ -254,6 +254,7 @@ int main() {
     GDALAllRegister();
     cout<< ">>> Starting timer count" << endl;
     auto start = chrono::steady_clock::now();
+    Bin::build_elevation_matrix();
     string road_shp, rail_shp, warea_shp, wline_shp, ib_shp, elev_bin_path, opath,slope_path;
     int road_bit, rail_bit, waterarea_bit, waterlines_bit, ib_bit, slope_bit;
     int dist_road, dist_rail, dist_water, dist_ib;
@@ -351,7 +352,7 @@ int main() {
 
     // ── elevation + slope ──────────────────────────────────────────────────
     cout << "\n=== elevation + slope ===\n";
-    Bin::build_elevation_matrix();
+
     cout << "[preprocess] reading " << ELEV_C << " x " << ELEV_R << " ElevCell grid from " << elev_bin_path << "\n";
 
     size_t elev_n = (size_t)ELEV_R * ELEV_C;
