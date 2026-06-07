@@ -3,5 +3,4 @@
 .clangd
 *.ppm
 x
-maps/
-preprocess/maps/
+preprocess/maps/new/

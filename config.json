@@ -17,8 +17,8 @@
     "rows": 33756
   },
   "input": {
-    "elevation": "./maps/alt/india.clipped.tif",
-    "ib": "./maps/ib/ib_7755.shp",
+    "elevation": "./maps/alt/alt.tif",
+    "ib": "./maps/ib/ib.shp",
     "rail": "./maps/rails/rails.shp",
     "road": "./maps/roads/roads.shp",
     "water_area": "./maps/water-areas/water_area.shp",
