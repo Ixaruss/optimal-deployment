@@ -14,13 +14,18 @@
  *
  ******************************************************************************/
 
+
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <mutex>
 #include <vector>
 #include <cmath>
 #include <thread>
-#include <future>
+
 #include <algorithm>
 #include "../common.h"
-
+using namespace std;
 /******************************************************************************
  * FAST SINGLE RAY
  *
@@ -31,16 +36,16 @@
  *
  ******************************************************************************/
 
-std::vector<LOSResult> Global::lineOfVisibilityFast(
+std::vector<LOSResult> Global::lineOfVisibilityopt(
     double lat0, double lon0, int h0,
     double lat1, double lon1, int h1)
 {
     int x0, y0, x1, y1;
-
+    std::cout << "multi threading version" << std::endl;
     if (!bin.getGridCoords(lat0, lon0, x0, y0) ||
         !bin.getGridCoords(lat1, lon1, x1, y1))
         return {};
-
+    auto s = chrono::steady_clock::now();
     float srcTerrain = bin.getElevation(lat0, lon0);
     if (srcTerrain < -9000.0f) return {};
 
@@ -136,73 +141,238 @@ std::vector<LOSResult> Global::lineOfVisibilityFast(
         if (e2 > -dy) { err -= dy; cx += sx; }
         if (e2 <  dx) { err += dx; cy += sy; }
     }
+    auto e = std::chrono::steady_clock::now();
+    auto total = std::chrono::duration_cast<std::chrono::microseconds>(e - s).count();
+    std::cout << "done. Processing time: " << total <<std::endl;
+    return results;
+}
+double maxAngle = -1e18;
+mutex state;
+void update_angle (double newAngle){
 
+    lock_guard<mutex> lock(state);
+    if (newAngle > maxAngle)
+                maxAngle = newAngle;
+}
+
+void process_chunk (std::vector<LOSResult> & results,const std::vector<int16_t>& elev_matrix, const std::vector<std::pair<int, int>> & cells, int x0,int y0 ,int cols, int rows,int srcElev){
+    for (size_t i = 0; i < cells.size(); i++)
+    {
+        int cx = cells[i].first;
+        int cy = cells[i].second;
+        if (cx < 0 || cy < 0 || cx >= cols || cy >= rows)
+            break;
+
+        float terrainElev = elev_matrix[(size_t)cx * cols + cy];
+
+        if (terrainElev < -9000.0f)
+            break;  // stepped outside grid
+
+        // Ground distance in meters
+        double ddx  = (cx - x0) * RESOLUTION;
+        double ddy  = (cy - y0) * RESOLUTION;
+        double dist = std::sqrt(ddx*ddx + ddy*ddy);
+
+        LOSResult r;
+        r.x   = cx;
+        r.y   = cy;
+        r.dist = dist;
+
+        // Source cell itself
+        if (i == 0)
+        {
+            r.angle    = 0.0;
+            r.maxAngle = -1e18;
+            r.visible  = true;
+            results.push_back(r);
+            continue;
+        }
+
+        // Elevation angle from source to top of this cell
+        r.angle = std::atan2(
+            terrainElev - srcElev,
+            dist);
+
+        // Visible if angle clears the horizon
+
+        r.maxAngle = maxAngle;
+        r.elev     = terrainElev;
+        // Update running horizon
+        update_angle(r.angle);
+
+        results.push_back(r);
+    }
+}
+
+std::vector<LOSResult> Global::lineOfVisibilitypara(double lat0, double long0,int h0, double lat1, double long1,int h1)
+{
+    int x0, y0;
+    int x1, y1;
+
+    if(!bin.getGridCoords(lat0, long0, x0, y0) || !bin.getGridCoords(lat1, long1, x1, y1)){
+        cout << "no" << endl;
+        return {};
+    }
+    auto s = chrono::steady_clock::now();
+    std::cout << "src grid: " << x0 << ", " << y0 << "\n";
+    std::cout << "dst grid: " << x1 << ", " << y1 << "\n";
+    std::cout << "grid size: " << conf.grid.cols << " x " << conf.grid.rows << "\n";
+
+    // Absolute source elevation
+
+
+    // Get cells along the ray
+    auto cells = Global::bresenham(x0, y0, x1, y1);
+
+    int numThreads = (int)std::thread::hardware_concurrency();
+    if (numThreads < 1) numThreads = 1;
+
+    int N = (int)cells.size();
+    vector<LOSResult> results(N);
+
+    float srcTerrain = bin.getElevation(lat0, long0);
+
+    if (srcTerrain < -9000.0f)
+        return results;  // source outside grid
+
+    double srcElev = srcTerrain + h0;
+
+
+    int chunkSize = (N + numThreads - 1) / numThreads;
+    vector<thread> pool;
+    for (int i =0; i< chunkSize; i++) {
+
+
+        pool.emplace_back(
+            thread(
+            process_chunk,
+            std::ref(results),
+            std::cref(bin.elev_matrix),
+            std::cref(cells),
+             x0,
+             y0,
+             conf.grid.cols,
+             conf.grid.rows,
+             srcElev
+            )
+        );
+    }
+
+    for(auto &t: pool) {
+        t.join();
+    }
+    auto e = std::chrono::steady_clock::now();
+    auto total = std::chrono::duration_cast<std::chrono::microseconds>(e - s).count();
+    std::cout << "done. Processing time: " << total <<std::endl;
     return results;
 }
 
-/******************************************************************************
- * BATCH MULTITHREADED LOS
- *
- * Runs multiple LOS queries in parallel.
- *
- * Usage:
- *
- *     std::vector<LOSQuery> queries = {
- *         {34.01, 74.50, 50,  34.16, 74.71, 500},
- *         {34.02, 74.51, 30,  34.20, 74.80, 100},
- *         ...
- *     };
- *
- *     auto results = g.lineOfVisibilityBatch(queries);
- *     // results[i] corresponds to queries[i]
- *
- * Thread count defaults to hardware concurrency.
- * Each query is independent — no shared writes.
- *
- ******************************************************************************/
 
-std::vector<std::vector<LOSResult>> Global::lineOfVisibilityBatch(
-    const std::vector<LOSQuery>& queries,
-    int numThreads)
+// ============================================================================
+// UPDATED HIGH-PERFORMANCE LINE OF SIGHT METHOD
+// ============================================================================
+std::vector<LOSResult> Global::lineOfVisibilityOptimized(double lat0, double long0, int h0, double lat1, double long1, int h1)
 {
-    if (numThreads <= 0)
-        numThreads = (int)std::thread::hardware_concurrency();
-    if (numThreads < 1) numThreads = 1;
+    int x0, y0;
+    int x1, y1;
 
-    int N = (int)queries.size();
-    std::vector<std::vector<LOSResult>> results(N);
-
-    // -------------------------------------------------------------------------
-    // PARTITION QUERIES INTO CHUNKS, ONE CHUNK PER THREAD
-    // -------------------------------------------------------------------------
-
-    std::vector<std::future<void>> futures;
-    futures.reserve(numThreads);
-
-    int chunkSize = (N + numThreads - 1) / numThreads;
-
-    for (int t = 0; t < numThreads; t++)
-    {
-        int start = t * chunkSize;
-        int end   = std::min(start + chunkSize, N);
-        if (start >= end) break;
-
-        futures.push_back(std::async(std::launch::async,
-            [this, &queries, &results, start, end]()
-            {
-                for (int i = start; i < end; i++)
-                {
-                    const auto& q = queries[i];
-                    results[i] = this->lineOfVisibilityFast(
-                        q.lat0, q.lon0, q.h0,
-                        q.lat1, q.lon1, q.h1);
-                }
-            }));
+    if (!bin.getGridCoords(lat0, long0, x0, y0) || !bin.getGridCoords(lat1, long1, x1, y1)) {
+        std::cout << "no" << std::endl;
+        return {};
     }
 
-    // wait for all threads
-    for (auto& f : futures)
-        f.get();
+    auto s = std::chrono::steady_clock::now();
+
+    // Absolute source elevation
+    float srcTerrain = bin.getElevation(lat0, long0);
+    if (srcTerrain < -9000.0f) return {};
+
+    double srcElev = srcTerrain + h0;
+
+    // 1. Get cells along the ray via Bresenham
+    auto cells = Global::bresenham(x0, y0, x1, y1);
+    size_t N = cells.size();
+    if (N == 0) return {};
+
+    // 2. ALLOCATE FLAT ALIGNED ARRAYS (Emulating Rust's continuous buffers)
+    // Allocating contiguous vectors allows the CPU to stream memory sequentially
+    std::vector<double> distances(N);
+    std::vector<double> angles(N);
+    std::vector<double> prefix_max(N);
+    std::vector<float> elevations(N);
+
+    std::vector<LOSResult> results;
+    results.reserve(N); // Crucial: Prevents internal vector re-allocations
+
+    // 3. STEP 1: PRE-CALCULATE DISTANCES & EXTRACT ELEVATIONS
+    // This loop isolates memory lookups so the CPU can pipeline them smoothly
+    for (size_t i = 0; i < N; ++i) {
+        int cx = cells[i].first;
+        int cy = cells[i].second;
+
+        if (cx < 0 || cy < 0 || (size_t)cx >= conf.grid.cols || (size_t)cy >= conf.grid.rows) {
+            N = i; // Clamp array size if we stepped out of bounds
+            break;
+        }
+
+        float terrainElev = bin.elev_matrix[(size_t)cx * conf.grid.cols + cy];
+        if (terrainElev < -9000.0f) {
+            N = i;
+            break;
+        }
+
+        elevations[i] = terrainElev;
+
+        // Mathematical Translation: Instead of doing slow std::sqrt and std::atan2,
+        // we can model the slope ratio directly if we want pure speed.
+        // To maintain your exact angle format, we calculate distances cleanly:
+        double ddx = (cx - x0) * RESOLUTION;
+        double ddy = (cy - y0) * RESOLUTION;
+        distances[i] = std::sqrt(ddx * ddx + ddy * ddy);
+    }
+
+    // If out-of-bounds triggered an immediate break
+    if (N == 0) return {};
+
+    // 4. STEP 2: VECTORIZABLE ANGLE CALCULATIONS (Rust's Angle Trait)
+    // No branches inside this loop. The compiler can easily unroll this loop
+    // or convert it to auto-SIMD hardware steps.
+    angles[0] = 0.0;
+    for (size_t i = 1; i < N; ++i) {
+        // angle = atan2(delta_height, distance)
+        angles[i] = std::atan2(elevations[i] - srcElev, distances[i]);
+    }
+
+    // 5. STEP 3: PREFIX MAXIMUM HORIZON PROCESSING (Rust's PrefixMax Trait)
+    // Eliminates conditional branch logic blocks using std::max, preventing
+    // pipeline flushes caused by branch mispredictions.
+    double current_max = -1e18;
+    prefix_max[0] = current_max;
+
+    for (size_t i = 1; i < N; ++i) {
+        prefix_max[i] = current_max;
+        current_max = std::max(current_max, angles[i]); // Compiled to a native hardware MAX instruction
+    }
+
+    // 6. STEP 4: ACCUMULATING MATERIALIZED RESULTS (Rust's Accumulate Trait)
+    for (size_t i = 0; i < N; ++i) {
+        LOSResult r;
+        r.x = cells[i].first;
+        r.y = cells[i].second;
+        r.dist = distances[i];
+        r.angle = angles[i];
+        r.maxAngle = prefix_max[i];
+        r.elev = elevations[i];
+
+        // Point is visible if its native viewing angle matches or beats the running horizon
+        r.visible = (i == 0) ? true : (angles[i] >= prefix_max[i]);
+
+        results.push_back(r);
+    }
+
+    auto e = std::chrono::steady_clock::now();
+    auto total = std::chrono::duration_cast<std::chrono::microseconds>(e - s).count();
+    std::cout << "done. Processing time: " << total << std::endl;
 
     return results;
 }

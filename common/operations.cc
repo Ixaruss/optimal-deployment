@@ -3,7 +3,7 @@
 #include <cmath>
 #include <chrono>
 #include "../common.h"
-#include "cpng.h"
+#include "lpng.h"
 using namespace std;
 
 /******************************************************************************
@@ -64,23 +64,22 @@ Global::bresenham(int x0, int y0, int x1, int y1)
 
 std::vector<LOSResult> Global::lineOfVisibility(double lat0, double long0,int h0, double lat1, double long1,int h1)
 {
-    Global g;
     int x0, y0;
     int x1, y1;
-     auto start = chrono::steady_clock::now();
-    if(!g.bin.getGridCoords(lat0, long0, x0, y0) || !g.bin.getGridCoords(lat1, long1, x1, y1)){
+
+    if(!bin.getGridCoords(lat0, long0, x0, y0) || !bin.getGridCoords(lat1, long1, x1, y1)){
         cout << "no" << endl;
         return {};
     }
-
+    auto s = chrono::steady_clock::now();
     std::cout << "src grid: " << x0 << ", " << y0 << "\n";
     std::cout << "dst grid: " << x1 << ", " << y1 << "\n";
-    std::cout << "grid size: " << g.conf.grid.cols << " x " << g.conf.grid.rows << "\n";
+    std::cout << "grid size: " << conf.grid.cols << " x " << conf.grid.rows << "\n";
 
     std::vector<LOSResult> results;
 
     // Absolute source elevation
-    float srcTerrain = g.bin.getElevation(lat0, long0);
+    float srcTerrain = bin.getElevation(lat0, long0);
 
     if (srcTerrain < -9000.0f)
         return results;  // source outside grid
@@ -96,10 +95,10 @@ std::vector<LOSResult> Global::lineOfVisibility(double lat0, double long0,int h0
     {
         int cx = cells[i].first;
         int cy = cells[i].second;
-        if (cx < 0 || cy < 0 || cx >= g.conf.grid.cols || cy >= g.conf.grid.rows)
+        if (cx < 0 || cy < 0 || cx >= conf.grid.cols || cy >= conf.grid.rows)
             break;
 
-        float terrainElev = g.bin.elev_matrix[(size_t)cx * g.conf.grid.cols + cy];
+        float terrainElev = bin.elev_matrix[(size_t)cx * conf.grid.cols + cy];
 
         if (terrainElev < -9000.0f)
             break;  // stepped outside grid
@@ -124,6 +123,7 @@ std::vector<LOSResult> Global::lineOfVisibility(double lat0, double long0,int h0
             continue;
         }
 
+
         // Elevation angle from source to top of this cell
         r.angle = std::atan2(
             terrainElev - srcElev,
@@ -135,11 +135,14 @@ std::vector<LOSResult> Global::lineOfVisibility(double lat0, double long0,int h0
         r.elev     = terrainElev;
         // Update running horizon
         if (r.angle > maxAngle)
-            maxAngle = r.angle;
+                    maxAngle = r.angle;
+
 
         results.push_back(r);
     }
-
+    auto e = std::chrono::steady_clock::now();
+    auto total = std::chrono::duration_cast<std::chrono::microseconds>(e - s).count();
+    std::cout << "done. Processing time: " << total <<std::endl;
     return results;
 }
 
@@ -147,17 +150,24 @@ std::vector<LOSResult> Global::lineOfVisibility(double lat0, double long0,int h0
  * EXAMPLE USAGE
  ******************************************************************************/
 
-#include <iostream>
+// #include <iostream>
 
-int main()
-{
-    Global g;
-    auto results = Global::lineOfVisibility(34.017346,74.50587999,50,34.16910062,74.71267172,500);
+// int main()
+// {
+//     Global g;
+//     // std::vector<LOSQuery> queries = {
+//     //      {25.01, 70.50, 50,  30.16, 75.71, 500}, };
 
-    png::generateLOSPng(results, "los_chart.png");
+//     // auto results = Global::lineOfVisibility(34.017346,74.50587999,50,34.16910062,74.71267172,500);
+//      g.lineOfVisibility(25.01, 70.50, 50,  30.16, 75.71, 500);
+//      g.lineOfVisibilityopt(25.01, 70.50, 50,  30.16, 75.71, 500);
+//      g.lineOfVisibilityOptimized(25.01, 70.50, 50,  30.16, 75.71, 500);
+//     // for (auto v: results){
+//     //    cout << "angle cell: " << v.angle << ", max angle: " << v.maxAngle << ", visible: " << v.visible << endl;
+//     // }
 
-    return 0;
-}
+//     return 0;
+// }
 
 
 // int main () {

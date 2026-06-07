@@ -1,179 +1,212 @@
+#define _USE_MATH_DEFINES // Ensures M_PI is loaded on all compilers
+#include <iostream>
 #include <vector>
 #include <cmath>
-#include <iostream>
-#include <fstream>
-#include <limits>
-#include <iomanip>
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include "../common.h"
+constexpr int16_t INVALID_ELEV = -32768;
 
-constexpr double PI = 3.14159265358979323846;
 
-struct Grid
-{
-    int    width;
-    int    height;
-    double cellSize;
-    std::vector<float> elev;
 
-    inline float get(int x, int y) const
-    {
-        if (x < 0 || y < 0 || x >= width || y >= height)
-            return -9999.0f;
-        return elev[static_cast<size_t>(y) * width + x];
+struct BinData {
+    std::vector<int16_t> elev_matrix;
+};
+
+
+struct LocalViewshedResult {
+    std::vector<uint8_t> visibility_grid; // Sized exactly to the (2*max_los + 1)^2 footprint
+    int width;
+};
+
+class FastLocalRotator {
+private:
+    double alpha;
+    double beta;
+    double center;
+    int width;
+
+    double invert_angle(double angle) {
+        return (angle > 0.0) ? (360.0 - angle) : 0.0;
+    }
+
+public:
+    FastLocalRotator(double angle_degrees, int local_width) : width(local_width) {
+        center = (local_width - 1) / 2.0;
+        double angle_inverted = invert_angle(std::fmod(angle_degrees, 360.0));
+        double theta = angle_inverted * M_PI / 180.0;
+        alpha = -std::tan(theta / 2.0);
+        beta = std::sin(theta);
+    }
+
+    inline std::pair<int, int> rotate(int x, int y) const {
+        double x_rel = x - center;
+        double y_rel = y - center;
+        x_rel = std::round(x_rel + alpha * y_rel);
+        y_rel = std::round(y_rel + beta * x_rel);
+        x_rel = std::round(x_rel + alpha * y_rel);
+        return {
+            std::clamp(static_cast<int>(x_rel + center), 0, width - 1),
+            std::clamp(static_cast<int>(y_rel + center), 0, width - 1)
+        };
     }
 };
 
-// Classic Bresenham line algorithm to find cell indices along a ray path
-static std::vector<std::pair<int, int>> bresenham(int x0, int y0, int x1, int y1)
-{
-    std::vector<std::pair<int, int>> cells;
-    int dx = std::abs(x1 - x0);
-    int dy = std::abs(y1 - y0);
-    int sx = (x0 < x1) ? 1 : -1;
-    int sy = (y0 < y1) ? 1 : -1;
-    int err = dx - dy;
+struct ReusableBuffers {
+    std::vector<double> distances;
+    std::vector<double> slopes;
+    std::vector<double> prefix_max;
+    std::vector<float> elevations;
+    std::vector<int> local_indices;
 
-    while (true)
-    {
-        cells.push_back({x0, y0});
-        if (x0 == x1 && y0 == y1) break;
-
-        int e2 = 2 * err;
-        if (e2 > -dy) { err -= dy; x0 += sx; }
-        if (e2 <  dx) { err += dx; y0 += sy; }
+    void resize(size_t size) {
+        distances.resize(size);
+        slopes.resize(size);
+        prefix_max.resize(size);
+        elevations.resize(size);
+        local_indices.resize(size);
     }
-    return cells;
+};
+
+// ============================================================================
+// THE LINE OF SIGHT CORE KERNEL
+// ============================================================================
+void processHorizontalCacheRay(
+    int max_los,
+    double resolution,
+    float srcElev,
+    const std::vector<int16_t>& local_dem_cache,
+    const FastLocalRotator& rotator,
+    ReusableBuffers& bufs,
+    std::vector<uint8_t>& local_visibility,
+    int max_dim)
+{
+    size_t N = max_los;
+    bufs.resize(N);
+
+    int local_center_x = max_dim / 2;
+    int center_row_y = max_dim / 2;
+
+    // --- STEP 1: Contiguous SAMPLING ---
+    for (size_t i = 0; i < N; ++i) {
+        int x_rotated_space = local_center_x + static_cast<int>(i);
+
+        auto [rx, ry] = rotator.rotate(x_rotated_space, center_row_y);
+
+        int cache_idx = ry * max_dim + rx;
+        bufs.local_indices[i] = cache_idx;
+
+        int16_t elev = local_dem_cache[cache_idx];
+        if (elev <= INVALID_ELEV || elev < -9000) {
+            bufs.elevations[i] = (i > 0) ? bufs.elevations[i-1] : 0.0f;
+        } else {
+            bufs.elevations[i] = static_cast<float>(elev);
+        }
+
+        bufs.distances[i] = i * resolution;
+    }
+
+    // --- STEP 2: SLOPE CALCULATION (Rise / Run) ---
+    bufs.slopes[0] = 0.0;
+    for (size_t i = 1; i < N; ++i) {
+        bufs.slopes[i] = (bufs.elevations[i] - srcElev) / (bufs.distances[i] + 0.0001);
+    }
+
+    // --- STEP 3: HORIZON PROCESSING (PrefixMax) ---
+    double current_max = -1e18;
+    for (size_t i = 1; i < N; ++i) {
+        bufs.prefix_max[i] = current_max;
+        current_max = std::max(current_max, bufs.slopes[i]);
+    }
+
+    // --- STEP 4: WRITEBACK TO LOCAL BITMAP ---
+    // FIXED: Writes out individual array positions explicitly using a standard loop element pass
+    for (size_t i = 1; i < N; ++i) {
+        if (bufs.slopes[i] >= bufs.prefix_max[i]) {
+            local_visibility[bufs.local_indices[i]] = 1;
+        }
+    }
 }
 
-/******************************************************************************
- * COMPUTE VIEWSHED
- * Calculates visibility for every cell by casting rays to the perimeter.
- * Updates a 2D boolean mask matrix representing structural visibility flags.
- ******************************************************************************/
-std::vector<bool> computeViewshed(const Grid& grid, int srcX, int srcY, double srcHeight)
+// ============================================================================
+// THE CACHED MASTER VIEWSHED ENGINE
+// ============================================================================
+LocalViewshedResult computeTotalViewshed(
+    int center_x, int center_y, int h0,
+    int max_los_cells, int num_angle_subdivisions,
+    const Global& g)
 {
-    // Initialize visibility output array (false = blocked/unseen, true = visible)
-    std::vector<bool> visibleMap(static_cast<size_t>(grid.width) * grid.height, false);
+    auto start_time = std::chrono::steady_clock::now();
 
-    float srcTerrain = grid.get(srcX, srcY);
-    if (srcTerrain < -9000.0f) return visibleMap; // Source is outside grid boundaries
+    size_t cols = static_cast<size_t>(g.conf.grid.cols);
+    size_t rows = static_cast<size_t>(g.conf.grid.rows);
+    double resolution = static_cast<double>(g.conf.grid.resolution);
 
-    double srcElev = srcTerrain + srcHeight;
-    visibleMap[static_cast<size_t>(srcY) * grid.width + srcX] = true; // Observer cell is always visible
+    int max_dim = (2 * max_los_cells) + 1;
+    size_t cache_box_size = static_cast<size_t>(max_dim) * max_dim;
 
-    // Collect all boundary edge cells along the structural perimeter
-    std::vector<std::pair<int, int>> perimeterCells;
+    // Extract the "Chocolate Bar" cache slice
+    std::vector<int16_t> local_dem_cache(cache_box_size, INVALID_ELEV);
+    std::vector<uint8_t> local_visibility(cache_box_size, 0);
 
-    // Top and bottom rows
-    for (int x = 0; x < grid.width; ++x) {
-        perimeterCells.push_back({x, 0});
-        if (grid.height > 1) perimeterCells.push_back({x, grid.height - 1});
-    }
-    // Left and right columns (skipping corners already handled)
-    for (int y = 1; y < grid.height - 1; ++y) {
-        perimeterCells.push_back({0, y});
-        if (grid.width > 1) perimeterCells.push_back({grid.width - 1, y});
-    }
+    int start_x = center_x - max_los_cells;
+    int start_y = center_y - max_los_cells;
 
-    // Cast an individual ray from the center out to every perimeter cell target
-    for (const auto& target : perimeterCells)
-    {
-        auto ray = bresenham(srcX, srcY, target.first, target.second);
-        double maxAngle = -std::numeric_limits<double>::infinity();
+    for (int y = 0; y < max_dim; ++y) {
+        int target_y = start_y + y;
+        if (target_y < 0 || (size_t)target_y >= rows) continue;
 
-        for (size_t i = 0; i < ray.size(); ++i)
-        {
-            int cx = ray[i].first;
-            int cy = ray[i].second;
-            size_t linearIndex = static_cast<size_t>(cy) * grid.width + cx;
+        size_t giant_row_offset = static_cast<size_t>(target_y) * cols;
+        int cache_row_offset = y * max_dim;
 
-            float terrainElev = grid.get(cx, cy);
-            if (terrainElev < -9000.0f) break; // Stepped off grid boundary edge
+        for (int x = 0; x < max_dim; ++x) {
+            int target_x = start_x + x;
+            if (target_x < 0 || (size_t)target_x >= cols) continue;
 
-            if (i == 0) continue; // Skip source cell handling inside the loop
-
-            double ddx = (cx - srcX) * grid.cellSize;
-            double ddy = (cy - srcY) * grid.cellSize;
-            double dist = std::sqrt(ddx * ddx + ddy * ddy);
-
-            double angle = std::atan2(terrainElev - srcElev, dist);
-
-            // Corrected strict horizon validation logic flag
-            if (angle > maxAngle)
-            {
-                visibleMap[linearIndex] = true;
-                maxAngle = angle;
-            }
+            local_dem_cache[cache_row_offset + x] = g.bin.elev_matrix[giant_row_offset + target_x];
         }
     }
 
-    return visibleMap;
+    int local_center_coord = max_dim / 2;
+    int16_t srcTerrainRaw = local_dem_cache[local_center_coord * max_dim + local_center_coord];
+    float srcElev = static_cast<float>(srcTerrainRaw) + h0;
+
+    // Flag the center radar location itself as visible
+    local_visibility[local_center_coord * max_dim + local_center_coord] = 1;
+
+    ReusableBuffers scratch_buffers;
+    scratch_buffers.resize(max_los_cells);
+
+    double angle_step = 360.0 / num_angle_subdivisions;
+
+    for (int a = 0; a < num_angle_subdivisions; ++a) {
+        double current_angle = a * angle_step;
+        FastLocalRotator rotator(current_angle, max_dim);
+
+        processHorizontalCacheRay(
+            max_los_cells, resolution, srcElev,
+            local_dem_cache, rotator, scratch_buffers, local_visibility, max_dim
+        );
+    }
+
+    auto end_time = std::chrono::steady_clock::now();
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    std::cout << ">>> Total Cached 300km Viewshed Grid Computed in: " << total_ms << " ms <<<\n";
+
+    return LocalViewshedResult{ local_visibility, max_dim };
 }
 
-int main()
-{
-    // Generate a 15x15 synthetic mountain hill terrain grid configuration
-    Grid grid;
-    grid.width = 15;
-    grid.height = 15;
-    grid.cellSize = 10.0;
-    grid.elev.resize(static_cast<size_t>(grid.width) * grid.height);
+// ============================================================================
+// VALIDATION TEST DRIVER
+// ============================================================================
+int main() {
+    Global g;
 
-    // Create a smooth geometric dome-shaped terrain obstacle hill layout
-    int centerX = 7, centerY = 7;
-    for (int y = 0; y < grid.height; ++y) {
-        for (int x = 0; x < grid.width; ++x) {
-            double dx = x - centerX;
-            double dy = y - centerY;
-            double dist = std::sqrt(dx * dx + dy * dy);
-            // Height drops off progressively moving away from center peak ridge point
-            grid.elev[static_cast<size_t>(y) * grid.width + x] = static_cast<float>(std::max(0.0, 50.0 - dist * 6.0));
-        }
-    }
+    std::cout << "Starting optimized engine validation step...\n";
+    // Compute a full 300 km range radar footprint using 64 angles
+    LocalViewshedResult output = computeTotalViewshed(3000, 3000, 15, 3000, 64, g);
 
-    // Introduce an artificial local ridge ring barrier wall setting to block visibility lines
-    grid.elev[4 * grid.width + 7] = 65.0f;
-    grid.elev[5 * grid.width + 7] = 65.0f;
-
-    // Run viewshed processing calculation framework profile step
-    int observerX = 7, observerY = 7;
-    double observerOffsetHeight = 2.0; // Observer stands 2 meters over the terrain layer point
-
-    std::vector<bool> viewshed = computeViewshed(grid, observerX, observerY, observerOffsetHeight);
-
-    // Output calculated matrix data stream results straight into another file
-    std::ofstream outFile("viewshed_output.txt");
-    if (!outFile) {
-        std::cerr << "CRITICAL ERROR: Failed to create/open output data stream target file.\n";
-        return 1;
-    }
-
-    outFile << "=== 360-DEGREE VIEWSHED ANALYSIS OUTPUT MAP ===\n";
-    outFile << "Grid Dimensions: " << grid.width << "x" << grid.height << " (Cell Spacing: " << grid.cellSize << "m)\n";
-    outFile << "Observer Location: (" << observerX << ", " << observerY << ") at Elevation: "
-            << grid.get(observerX, observerY) + observerOffsetHeight << "m MSL\n\n";
-
-    outFile << "LEGEND KEY MAP VIEW:\n";
-    outFile << "  [X] -> Observer Spot Position\n";
-    outFile << "  [V] -> Visible Location Node\n";
-    outFile << "  [.] -> Hidden / Obscured Shaded Dead Zone Area\n\n";
-
-    // Build ASCII map visualization graphic matrix layout representation
-    for (int y = 0; y < grid.height; ++y)
-    {
-        for (int x = 0; x < grid.width; ++x)
-        {
-            if (x == observerX && y == observerY) {
-                outFile << " X ";
-            } else {
-                size_t idx = static_cast<size_t>(y) * grid.width + x;
-                outFile << (viewshed[idx] ? " V " : " . ");
-            }
-        }
-        outFile << "\n";
-    }
-
-    outFile.close();
-    std::cout << "SUCCESS: Full directional viewshed data map written to 'viewshed_output.txt'\n";
-
+    std::cout << "Calculated Footprint array dimension: " << output.width << " x " << output.width << " elements.\n";
     return 0;
 }

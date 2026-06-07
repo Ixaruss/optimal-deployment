@@ -31,7 +31,6 @@
 #include <cmath>
 #include <thread>
 #include <future>
-#include <atomic>
 #include <algorithm>
 #include <cstdint>
 #include "../common.h"
@@ -52,14 +51,6 @@ constexpr double EARTH_RADIUS_M = 6371000.0;
  *
  ******************************************************************************/
 
-struct CoverageResult
-{
-    std::vector<uint8_t>              visibility;  // flat grid
-    std::vector<std::vector<LOSResult>> rays;      // per-ray detail
-    int srcX, srcY;
-    int radiusCells;
-    int gridCols, gridRows;
-};
 
 /******************************************************************************
  * MIDPOINT CIRCLE ALGORITHM
@@ -238,7 +229,7 @@ CoverageResult Global::radarCoverage(
 
     if (!bin.getGridCoords(lat, lon, out.srcX, out.srcY))
         return out;
-
+    auto start_time = std::chrono::steady_clock::now();
     float srcTerrain = bin.getElevation(lat, lon);
     if (srcTerrain < -9000.0f) return out;
 
@@ -317,7 +308,9 @@ CoverageResult Global::radarCoverage(
                 }
             }));
     }
-
+    auto end_time = std::chrono::steady_clock::now();
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+    std::cout << ">>> Total Grid Computed in: " << total_ms << " ms <<<\n";
     for (auto& f : futures)
         f.get();
 
@@ -339,23 +332,23 @@ int coverageVisibleCount(const CoverageResult& cov)
  * EXAMPLE USAGE
  ******************************************************************************/
 
-// int main()
-// {
-//     Global g;
-//
-//     auto cov = g.radarCoverage(
-//         34.017346, 74.50587999,  // lat, lon
-//         30,                      // 30m antenna height
-//         50000.0,                 // 50 km radius
-//         true,                    // earth curvature
-//         0);                      // auto thread count
-//
-//     printf("Visible cells: %d / total boundary rays: %d\n",
-//            coverageVisibleCount(cov),
-//            (int)cov.rays.size());
-// }
-//
-//
+int main()
+{
+    Global g;
+
+    auto cov = g.radarCoverage(
+        34.017346, 74.50587999,  // lat, lon
+        30,                      // 30m antenna height
+        600000.0,                // 50 km radius
+        true,                    // earth curvature
+        0);                      // auto thread count
+
+    printf("Visible cells: %d / total boundary rays: %d\n",
+           coverageVisibleCount(cov),
+           (int)cov.rays.size());
+}
+
+
 /**
  * Boundary cell approach — circleBoundary() uses the midpoint circle algorithm (integer only, no trig) to enumerate exactly the perimeter cells. This gives ~2πR rays which is the theoretical minimum to cover the interior with no gaps. A 50km radius at 90m/cell = ~3490 boundary cells = 3490 rays, each fully covering their spoke inward.
  Safe concurrent writes — the visibility grid is uint8_t and every write is value 1. Two threads writing the same cell simultaneously both write 1 — no corruption, no mutex needed. This avoids any locking overhead in the inner loop.
