@@ -1,57 +1,47 @@
 {
-    "distance" : 
-    {
-        "from_ib" : 1000,
-        "from_rail" : 0,
-        "from_road" : 0,
-        "from_water" : 0
-    },
-    "grid" : 
-    {
-        "cols" : 33041,
-        "max_x" : 5964985.3241586136,
-        "max_y" : 5532710.7563468125,
-        "min_x" : 2660978.1140525648,
-        "min_y" : 2157151.5814053733,
-        "origin_x" : 2660978.0,
-        "origin_y" : 5532711.0,
-        "resolution" : 100,
-        "rows" : 33756
-    },
-    "input" : 
-    {
-        "elevation" : "./maps/alt/india.clipped.tif",
-        "ib" : "./maps/ib/ib_7755.shp",
-        "rail" : "./maps/rails/rails.shp",
-        "road" : "./maps/roads/roads.shp",
-        "water_area" : "./maps/water-areas/water_area.shp",
-        "water_lines" : "./maps/water-lines/water_lines.shp"
-    },
-    "layers" : 
-    {
-        "0" : "roads",
-        "1" : "railways",
-        "2" : "waterbodies",
-        "3" : "waterlines",
-        "4" : "ib",
-        "5" : "slope"
-    },
-    "operation_area" : 
-    [
-        31.399999999999999,
-        74.200000000000003,
-        31.399999999999999,
-        75.200000000000003,
-        32.200000000000003,
-        75.200000000000003,
-        32.200000000000003,
-        74.200000000000003
-    ],
-    "output" : 
-    {
-        "elevation_file" : "./bin/elev.bin",
-        "feasible" : "./bin/feasible.bin",
-        "matrix_file" : "./bin/map.bin"
-    },
-    "target" : "build"
+  "distance": {
+    "from_ib": 1000,
+    "from_rail": 0,
+    "from_road": 0,
+    "from_water": 0
+  },
+  "grid": {
+    "cols": 33041,
+    "max_x": 5964985.3241586136,
+    "max_y": 5532710.7563468125,
+    "min_x": 2660978.1140525648,
+    "min_y": 2157151.5814053733,
+    "origin_x": 2660978.0,
+    "origin_y": 5532711.0,
+    "resolution": 100,
+    "rows": 33756
+  },
+  "input": {
+    "elevation": "./maps/alt/india.clipped.tif",
+    "ib": "./maps/ib/ib_7755.shp",
+    "rail": "./maps/rails/rails.shp",
+    "road": "./maps/roads/roads.shp",
+    "water_area": "./maps/water-areas/water_area.shp",
+    "water_lines": "./maps/water-lines/water_lines.shp"
+  },
+  "layers": {
+    "0": "roads",
+    "1": "railways",
+    "2": "waterbodies",
+    "3": "waterlines",
+    "4": "ib",
+    "5": "slope"
+  },
+  "operation_area": [
+    31.399999999999999, 74.200000000000003, 31.399999999999999,
+    75.200000000000003, 32.200000000000003, 75.200000000000003,
+    32.200000000000003, 74.200000000000003
+  ],
+  "output": {
+    "elevation_file": "./bin/elev.bin",
+    "feasible": "./bin/feasible.bin",
+    "matrix_file": "./bin/map.bin",
+    "slope_file": "./bin/slope.bin"
+  },
+  "target": "build"
 }
