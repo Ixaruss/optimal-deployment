@@ -4,3 +4,6 @@
 *.ppm
 x
 preprocess/maps/new/
+*.png
+*.svg
+*.ppm
