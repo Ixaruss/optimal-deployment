@@ -254,6 +254,8 @@ int main() {
     GDALAllRegister();
     cout<< ">>> Starting timer count" << endl;
     auto start = chrono::steady_clock::now();
+    make_dir("bin");
+    make_dir("image");
     Bin::build_elevation_matrix();
     string road_shp, rail_shp, warea_shp, wline_shp, ib_shp, elev_bin_path, opath,slope_path;
     int road_bit, rail_bit, waterarea_bit, waterlines_bit, ib_bit, slope_bit;
@@ -317,8 +319,7 @@ int main() {
         slope_path     = DEFAULT_SLOPE_MATRIX;
     }
 
-    make_dir("bin");
-    make_dir("image");
+
 
     int    ROWS = lib::calc_rows(RESOLUTION);
     int    COLS = lib::calc_cols(RESOLUTION);
