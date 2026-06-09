@@ -1,6 +1,6 @@
 // Downloaded from https://repo.progsbase.com - Code Developed Using progsbase.
 
-#include "pbPlots.hpp"
+#include "pbPlots.h"
 
 using namespace std;
 
