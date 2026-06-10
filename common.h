@@ -17,14 +17,6 @@ struct LOSResult
     bool   visible;
     int elev;
 };
-struct CoverageResult
-{
-    std::vector<uint8_t>              visibility;  // flat grid
-    std::vector<std::vector<LOSResult>> rays;      // per-ray detail
-    int srcX, srcY;
-    int radiusCells;
-    int gridCols, gridRows;
-};
 struct RadarQuery
 {
     double lat, lon;
@@ -39,12 +31,6 @@ struct LOSQuery
     double lat1, lon1; int h1;
 };
 
-//
-//   std::vector<LOSResult> lineOfVisibilityFast(
-//       double lat0, double lon0, int h0,
-//       double lat1, double lon1, int h1);
-//
-
 class Global {
 public:
     Bin bin;
@@ -52,10 +38,9 @@ public:
     Global() {
         bin.init({ ELEVATION });
     }
+    public: static void preprocess(bool images = 0, bool timer = false, bool seperate = false);
 
     public: std::vector<LOSResult>  lineOfVisibilityopt(double lat0, double lon0, int h0, double lat1, double lon1, int h1);
-
-    public: std::vector<LOSResult>  lineOfVisibilitypara(double lat0, double lon0, int h0, double lat1, double lon1, int h1);
 
     public: std::vector<LOSResult> lineOfVisibilityOptimized(double lat0, double lon0, int h0, double lat1, double lon1, int h1);
 
@@ -80,21 +65,6 @@ public:
                                                       OGRCoordinateTransformation* poForwardCT,
                                                       OGRCoordinateTransformation* poInverseCT,
                                                       double& outLon, double& outLat);
-    CoverageResult radarCoverage(
-        double lat,    double lon,
-        int    heightAbove,
-        double radiusMeters,
-        bool   earthCurvature,
-        int    numThreads);
-    CoverageResult radarCoverageFast(
-        double lat,    double lon,
-        int    heightAbove,
-        double radiusMeters,
-        bool   earthCurvature,
-        int    numThreads);
-    std::vector<CoverageResult> radarCoverageBatch(
-        const std::vector<RadarQuery>& queries,
-        int numThreads);
 
 };
 
