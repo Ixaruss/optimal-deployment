@@ -1,6 +1,8 @@
 #include "../bin.h"
 #include <cstdint>
 #include <gdal_utils.h>
+#include <filesystem>
+
 using namespace std;
 
 // Horn's formula, nodata-aware.
@@ -54,7 +56,6 @@ int Bin::build_elevation_matrix(bool split) {
     Config::is_available() ? opath = Config::load().output.elevation_file : opath = DEFAULT_ELEVATION_MATRIX;
     Config::is_available() ? ipath = Config::load().input.elevation        : ipath = DEFAULT_ELEVATION_FILE;
     GDALAllRegister();
-
     // ── 1. open source TIF ─────────────────────────────────────────────────
     cout << "[elevation] Opening: " << ipath << "\n";
     GDALDataset* src_ds = (GDALDataset*)GDALOpenEx(

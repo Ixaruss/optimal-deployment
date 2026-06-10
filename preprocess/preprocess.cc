@@ -3,6 +3,7 @@
 #include <png.h>
 #include "bin.h"
 #include "lib.h"
+#include "../common.h"
 #include <chrono>
 using namespace std;
 
@@ -249,13 +250,14 @@ static void print_elev_stats(const int16_t* elevation,const float* slope, size_t
     cout << "[preprocess] nodata    : " << nodata << " (" << (nodata * 100.0 / N) << "%)\n";
 }
 
-// // ── main ───────────────────────────────────────────────────────────────────
-int main() {
+void Global::preprocess(bool images, bool timer, bool seperate) {
     GDALAllRegister();
-    cout<< ">>> Starting timer count" << endl;
-    auto start = chrono::steady_clock::now();
+     chrono::time_point<chrono::steady_clock, chrono::duration<long, ratio<1, 1000000000>>> start,end;
+    if (timer){ cout<< ">>> Starting timer count" << endl;
+         start = chrono::steady_clock::now();
+    }
     make_dir("bin");
-    make_dir("image");
+    if (images) make_dir("image");
     Bin::build_elevation_matrix();
     string road_shp, rail_shp, warea_shp, wline_shp, ib_shp, elev_bin_path, opath,slope_path;
     int road_bit, rail_bit, waterarea_bit, waterlines_bit, ib_bit, slope_bit;
@@ -352,6 +354,7 @@ int main() {
     };
 
     // ── elevation + slope ──────────────────────────────────────────────────
+
     cout << "\n=== elevation + slope ===\n";
 
     cout << "[preprocess] reading " << ELEV_C << " x " << ELEV_R << " ElevCell grid from " << elev_bin_path << "\n";
@@ -360,8 +363,8 @@ int main() {
     int16_t* elev = (int16_t*)malloc(elev_n * sizeof(int16_t));
     float* slope  = (float*)malloc(elev_n * sizeof(float));
 
-    if (!elev) { cerr << "[preprocess] ERROR: cannot allocate elevation buffer\n"; return 1; }
-    if (!slope) { cerr << "[preprocess] ERROR: cannot allocate slope buffer\n"; return 1; }
+    if (!elev) { cerr << "[preprocess] ERROR: cannot allocate elevation buffer\n"; return; }
+    if (!slope) { cerr << "[preprocess] ERROR: cannot allocate slope buffer\n"; return; }
 
     FILE* ef = fopen(elev_bin_path.c_str(), "rb");
     FILE* sf = fopen(slope_path.c_str(), "rb");
@@ -388,7 +391,7 @@ int main() {
             fclose(sf);
             free(elev);
             free(slope);
-            return 1;
+            return ;
         }
 
         size_t read = fread(elev, sizeof(int16_t), elev_n, ef);
@@ -398,17 +401,20 @@ int main() {
         fclose(sf);
 
         print_elev_stats(elev, slope, read);
-        uint8_t* rgb_e = elev_to_rgb(elev, read);
-        if (rgb_e) {
-            write_png("image/elev.png", ELEV_R, ELEV_C, rgb_e);
-            free(rgb_e);
+        if (images){
+            uint8_t* rgb_e = elev_to_rgb(elev, read);
+            if (rgb_e) {
+                write_png("image/elev.png", ELEV_R, ELEV_C, rgb_e);
+                free(rgb_e);
+            }
+
+            uint8_t* rgb_s = slope_to_rgb(slope, read1);
+            if (rgb_s) {
+                write_png("image/slope.png", ELEV_R, ELEV_C, rgb_s);
+                free(rgb_s);
+            }
         }
 
-        uint8_t* rgb_s = slope_to_rgb(slope, read1);
-        if (rgb_s) {
-            write_png("image/slope.png", ELEV_R, ELEV_C, rgb_s);
-            free(rgb_s);
-        }
 
         // ── CRITICAL STEP: Burn slope bit to combined matrix ────────────────
         // Condition: slope < 10. Bit position: 5 (1 << 5)
@@ -424,21 +430,20 @@ int main() {
         free(slope); // Freed safely after matrix calculations
     }
 
-    auto f = fopen(opath.c_str(), "wb");
-    fwrite(matrix, 1, N, f);
-    fclose(f);
 
-    auto end = chrono::steady_clock::now();
-    int elevTime = chrono::duration_cast<chrono::seconds>(end - start).count();
-
-    start = chrono::steady_clock::now();
+    int elevTime ;
+    if(timer){
+        end = chrono::steady_clock::now();
+       elevTime = chrono::duration_cast<chrono::seconds>(end - start).count();
+       start = chrono::steady_clock::now();
+    }
     for (auto& job : jobs) {
         cout << "\n=== " << job.name << " (buffer=" << job.distance << "m) ===\n";
         if (!lib::is_7755(job.shp)) {
             cout << "[preprocess] reprojecting " << job.shp << "...\n";
             if (lib::reproject(job.shp) != 0) {
                 cerr << "[preprocess] ERROR: reprojection failed\n";
-                return -1;
+                return;
             }
         }
         uint8_t* buf = rasterize_layer(job.shp, ROWS, COLS, ox, oy, job.boundary_only);
@@ -463,29 +468,43 @@ int main() {
         feasible += final_hits;
         cout << "[preprocess] final hits : " << final_hits << " (" << (final_hits * 100.0 / N) << "%)\n";
 
-        write_bin_u8("bin/" + job.name + ".bin", buf, N);
+        if (seperate) {
+            write_bin_u8("bin/" + job.name + ".bin", buf, N);
+        }
 
-        uint8_t* rgb = mask_to_rgb(buf, N);
-        if (rgb) {
-            write_png("image/" + job.name + ".png", ROWS, COLS, rgb);
-            free(rgb);
+        if (images) {
+            uint8_t* rgb = mask_to_rgb(buf, N);
+            if (rgb) {
+                write_png("image/" + job.name + ".png", ROWS, COLS, rgb);
+                free(rgb);
+            }
         }
         free(buf);
     }
-    end = chrono::steady_clock::now();
-    int constraintTime = chrono::duration_cast<chrono::seconds>(end - start).count();
 
+    auto f = fopen(opath.c_str(), "wb");
+    fwrite(matrix, 1, N, f);
+    fclose(f);
 
-    uint8_t* rgb = mask_to_rgb(matrix, N);
-    if (rgb) {
-        write_png("image/combined.png", ROWS, COLS, rgb);
-        free(rgb);
+    int constraintTime;
+    if(timer){
+        end = chrono::steady_clock::now();
+         constraintTime = chrono::duration_cast<chrono::seconds>(end - start).count();
+        cout<< ">>> feasible bin took combined: " << constraintTime << " seconds (with png writing)" << endl;
     }
-    cout << "\n>>> Elevation Build took: " << elevTime << " seconds (with png writing)" << endl;
-    cout << "\n>>> feasible bin took combined: " << constraintTime << " seconds (with png writing)" << endl;
 
+    if (images) {
+        uint8_t* rgb = mask_to_rgb(matrix, N);
+        if (rgb) {
+            write_png("image/combined.png", ROWS, COLS, rgb);
+            free(rgb);
+        }
+    }
+    if(timer) {
+    cout << "\n>>> Elevation Build took: " << elevTime << " seconds"<< (images ? " (with png writing)" : "") << endl;
+    cout << "\n>>> feasible bin took combined: " << constraintTime << " seconds" << (images ? " (with png writing)" : "") << endl;
+    }
     cout<< "total cells: " << total <<endl;
-    cout<< "feasible cells: " << feasible << "i.e." << (feasible/total) * 100 << "%" <<endl;
+    cout<< "feasible cells: " << feasible << "i.e. " << ((double)feasible / total) * 100 << "%" <<endl;
     cout << "\n>>> Completed All Tasks Succesfully..\n";
-    return 0;
-}
+    }
