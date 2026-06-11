@@ -190,13 +190,15 @@ int main(int argc, char** argv) {
     else if (*los_sub) {
         auto res = g.lineOfVisibilityopt(srcLat, srcLon, los_ant_height, tgtLat, tgtLon, los_tgt_height);
         auto target = res.back();
-
+        float srcTerrain = g.bin.getElevation(srcLat, srcLon);
+        double srcElev = srcTerrain + los_ant_height;
            if (detailed) {
                std::cout << "=========================================\n";
                   std::cout << "Target Status : " << (target.visible ? "VISIBLE" : "BLOCKED") << "\n";
                   std::cout << "Total Distance: " << std::fixed << std::setprecision(2) << target.dist << " meters\n";
                   std::cout << "Final Angle   : " << target.angle << "°\n";
                   std::cout << "Max Obstacle  : " << target.maxAngle << "°\n";
+                  std::cout << "Src elev      : " << srcElev << "m\n";
                   std::cout << "Target Elev   : " << target.elev << "m\n";
                   std::cout << "=========================================\n\n";
 

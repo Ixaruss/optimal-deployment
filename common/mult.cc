@@ -22,7 +22,6 @@ std::vector<LOSResult> Global::lineOfVisibilityopt(
     double lat1, double lon1, int h1)
 {
     int x0, y0, x1, y1;
-    std::cout << "multi threading version" << std::endl;
     if (!bin.getGridCoords(lat0, lon0, x0, y0) ||
         !bin.getGridCoords(lat1, lon1, x1, y1))
         return {};
