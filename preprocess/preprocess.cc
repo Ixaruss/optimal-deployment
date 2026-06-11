@@ -501,7 +501,7 @@ void Global::preprocess(bool images, bool timer, bool seperate) {
     }
     if(timer) {
     cout << "\n>>> Elevation Build took: " << elevTime << " seconds"<< (images ? " (with png writing)" : "") << endl;
-    cout << "\n>>> Combined bin took combined: " << constraintTime << " seconds" << (images ? " (with png writing)" : "") << endl;
+    cout << "\n>>> Combined bin took: " << constraintTime << " seconds" << (images ? " (with png writing)" : "") << endl;
     }
     cout<< "total cells: " << total <<endl;
     cout<< "feasible cells: " << feasible << "i.e. " << ((double)feasible / total) * 100 << "%" <<endl;
