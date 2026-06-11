@@ -490,7 +490,6 @@ void Global::preprocess(bool images, bool timer, bool seperate) {
     if(timer){
         end = chrono::steady_clock::now();
          constraintTime = chrono::duration_cast<chrono::seconds>(end - start).count();
-        cout<< ">>> feasible bin took combined: " << constraintTime << " seconds (with png writing)" << endl;
     }
 
     if (images) {
@@ -502,7 +501,7 @@ void Global::preprocess(bool images, bool timer, bool seperate) {
     }
     if(timer) {
     cout << "\n>>> Elevation Build took: " << elevTime << " seconds"<< (images ? " (with png writing)" : "") << endl;
-    cout << "\n>>> feasible bin took combined: " << constraintTime << " seconds" << (images ? " (with png writing)" : "") << endl;
+    cout << "\n>>> Combined bin took combined: " << constraintTime << " seconds" << (images ? " (with png writing)" : "") << endl;
     }
     cout<< "total cells: " << total <<endl;
     cout<< "feasible cells: " << feasible << "i.e. " << ((double)feasible / total) * 100 << "%" <<endl;

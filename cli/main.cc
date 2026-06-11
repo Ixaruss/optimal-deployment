@@ -8,10 +8,10 @@ int main(int argc, char** argv) {
     app.require_subcommand(1);
 
     auto pre_sub = app.add_subcommand("build", "Build bin files from corresponding maps. config REQUIRED");
-    bool images = false, timer = false;
+    bool images = false, timer = false, s = false;
     pre_sub->add_flag("-v,--with-images",images,"Generates images for bin visualization");
     pre_sub->add_flag("-c,--count-time",timer,"Counts the time taken for preprocessing");
-
+    pre_sub->add_flag("-a,--all",s,"create all bins");
     auto viewshed_sub = app.add_subcommand("viewshed", "Calculate viewshed for a given location");
 
     double vs_lat = 33.9871;
@@ -98,8 +98,9 @@ int main(int argc, char** argv) {
         return app.exit(e);
     }
 
-    Global g;
+
     if (*viewshed_sub) {
+        Global g;
         vs_curvature = !no_curvature; // Flip state if flag passed
 
         auto engine = std::make_unique<ViewshedEngine>(
@@ -112,6 +113,7 @@ int main(int argc, char** argv) {
 
     // Route 2: Execution for Radar
     else if (*radar_sub) {
+        Global g;
         RadarEngine engine(
             g, r_lat, r_lon, r_ant_agl, r_tgt_agl, r_min_elev, r_max_elev, r_max_range
         );
@@ -141,9 +143,10 @@ int main(int argc, char** argv) {
         }
     }
     else if (*pre_sub) {
-        Global::preprocess(images,timer);
+        Global::preprocess(images,timer,s);
     }
     else if (*rlos_sub) {
+        Global g;
         if (!detailed) {
             // 1. Fast LOS Workflow
             auto res = RadarEngine::radarLOS(
@@ -188,6 +191,7 @@ int main(int argc, char** argv) {
         }
     }
     else if (*los_sub) {
+        Global g;
         auto res = g.lineOfVisibilityopt(srcLat, srcLon, los_ant_height, tgtLat, tgtLon, los_tgt_height);
         auto target = res.back();
         float srcTerrain = g.bin.getElevation(srcLat, srcLon);
